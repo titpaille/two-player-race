@@ -127,19 +127,19 @@ function buildTrackMeshes(scene: THREE.Scene) {
   scene.add(startGroup);
 
   // Some decorative trees
-  const trunkGeo = new THREE.CylinderGeometry(0.4, 0.5, 2, 8);
+  const trunkGeo = new THREE.CylinderGeometry(0.6, 0.8, 3, 8);
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3a20 });
-  const leafGeo = new THREE.ConeGeometry(2, 4, 10);
+  const leafGeo = new THREE.ConeGeometry(3, 6, 10);
   const leafMat = new THREE.MeshStandardMaterial({ color: 0x2e6b2a });
-  for (let i = 0; i < 40; i++) {
-    const tx = (Math.random() - 0.5) * 360;
-    const tz = (Math.random() - 0.5) * 360;
+  for (let i = 0; i < 90; i++) {
+    const tx = (Math.random() - 0.5) * 820;
+    const tz = (Math.random() - 0.5) * 820;
     // keep trees off the track
-    if (Math.abs(tx) < OUTER_RX + 8 && Math.abs(tz) < OUTER_RZ + 8) continue;
+    if (Math.abs(tx) < OUTER_RX + 15 && Math.abs(tz) < OUTER_RZ + 15) continue;
     const trunk = new THREE.Mesh(trunkGeo, trunkMat);
     const leaves = new THREE.Mesh(leafGeo, leafMat);
-    trunk.position.set(tx, 1, tz);
-    leaves.position.set(tx, 4, tz);
+    trunk.position.set(tx, 1.5, tz);
+    leaves.position.set(tx, 6, tz);
     trunk.castShadow = true;
     leaves.castShadow = true;
     scene.add(trunk);
