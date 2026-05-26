@@ -386,12 +386,12 @@ export default function RaceGame3D() {
       carsRef.current.forEach((car, i) => {
         const fx = Math.cos(car.angle);
         const fz = Math.sin(car.angle);
-        const camDist = 11;
-        const camHeight = 5.5;
+        const camDist = 18;
+        const camHeight = 8;
         const cx = car.pos.x - fx * camDist;
         const cz = car.pos.z - fz * camDist;
         cams[i].position.set(cx, camHeight, cz);
-        cams[i].lookAt(car.pos.x + fx * 5, 1.5, car.pos.z + fz * 5);
+        cams[i].lookAt(car.pos.x + fx * 8, 2, car.pos.z + fz * 8);
       });
 
       // Split-screen rendering
