@@ -63,8 +63,13 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
+  --background: oklch(0.18 0.03 250);
+  --foreground: oklch(0.97 0.01 100);
+  --track: oklch(0.28 0.02 250);
+  --track-line: oklch(0.95 0.02 100);
+  --grass: oklch(0.45 0.15 145);
+  --p1: oklch(0.7 0.22 25);
+  --p2: oklch(0.75 0.18 230);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
