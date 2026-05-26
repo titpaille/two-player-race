@@ -4,10 +4,10 @@ import * as THREE from "three";
 const TOTAL_LAPS = 3;
 
 // Oval track (XZ plane)
-const OUTER_RX = 80;
-const OUTER_RZ = 50;
-const INNER_RX = 50;
-const INNER_RZ = 22;
+const OUTER_RX = 200;
+const OUTER_RZ = 130;
+const INNER_RX = 130;
+const INNER_RZ = 60;
 
 function onTrack(x: number, z: number) {
   const a = (x / OUTER_RX) ** 2 + (z / OUTER_RZ) ** 2;
