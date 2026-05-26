@@ -315,10 +315,10 @@ export default function RaceGame3D() {
         if (any(c.left)) turn = -1;
         if (any(c.right)) turn = 1;
 
-        const maxSpeed = 55;
-        const accelRate = 38;
-        const brakeRate = 60;
-        const friction = 14;
+        const maxSpeed = 90;
+        const accelRate = 55;
+        const brakeRate = 75;
+        const friction = 18;
 
         if (accel > 0) car.speed = Math.min(maxSpeed, car.speed + accelRate * dt);
         else if (accel < 0) car.speed = Math.max(-maxSpeed * 0.4, car.speed - brakeRate * dt);
