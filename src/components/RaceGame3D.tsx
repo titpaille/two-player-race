@@ -114,14 +114,14 @@ function buildTrackMeshes(scene: THREE.Scene) {
     scene.add(m);
   }
 
-  // Start/finish line at x≈0, z between INNER_RZ and OUTER_RZ on the +z side... use -z
+  // Start/finish line at x≈0, z between INNER_RZ and OUTER_RZ
   const startGroup = new THREE.Group();
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 12; i++) {
     const tile = new THREE.Mesh(
-      new THREE.BoxGeometry(0.8, 0.05, 3.5),
+      new THREE.BoxGeometry(1.2, 0.05, 5),
       new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xffffff : 0x111111 }),
     );
-    tile.position.set(-INNER_RX - 3.5 + i * 0.8, 0.02, 0);
+    tile.position.set(-INNER_RX - 6 + i * 1.2, 0.02, 0);
     startGroup.add(tile);
   }
   scene.add(startGroup);
