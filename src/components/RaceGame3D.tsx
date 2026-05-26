@@ -249,19 +249,19 @@ export default function RaceGame3D() {
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x87ceeb, 120, 320);
+    scene.fog = new THREE.Fog(0x87ceeb, 200, 700);
 
     // Lights
     const hemi = new THREE.HemisphereLight(0xffffff, 0x556633, 0.7);
     scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-    sun.position.set(60, 100, 40);
+    sun.position.set(120, 180, 80);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -120;
-    sun.shadow.camera.right = 120;
-    sun.shadow.camera.top = 120;
-    sun.shadow.camera.bottom = -120;
+    sun.shadow.camera.left = -300;
+    sun.shadow.camera.right = 300;
+    sun.shadow.camera.top = 300;
+    sun.shadow.camera.bottom = -300;
     scene.add(sun);
 
     buildTrackMeshes(scene);
