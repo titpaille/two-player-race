@@ -152,7 +152,7 @@ export default function RaceGame3D() {
   const keysRef = useRef<Record<string, boolean>>({});
   const carsRef = useRef<CarState[]>([
     {
-      pos: new THREE.Vector3(-INNER_RX - 5, 0, 4),
+      pos: new THREE.Vector3(-INNER_RX - 12, 0, 6),
       angle: 0,
       speed: 0,
       lap: 0,
@@ -160,7 +160,7 @@ export default function RaceGame3D() {
       name: "P1",
     },
     {
-      pos: new THREE.Vector3(-INNER_RX - 5, 0, -4),
+      pos: new THREE.Vector3(-INNER_RX - 12, 0, -6),
       angle: 0,
       speed: 0,
       lap: 0,
