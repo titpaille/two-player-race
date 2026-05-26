@@ -4,10 +4,10 @@ import * as THREE from "three";
 const TOTAL_LAPS = 3;
 
 // Oval track (XZ plane)
-const OUTER_RX = 80;
-const OUTER_RZ = 50;
-const INNER_RX = 50;
-const INNER_RZ = 22;
+const OUTER_RX = 200;
+const OUTER_RZ = 130;
+const INNER_RX = 130;
+const INNER_RZ = 60;
 
 function onTrack(x: number, z: number) {
   const a = (x / OUTER_RX) ** 2 + (z / OUTER_RZ) ** 2;
@@ -63,7 +63,7 @@ function makeCarMesh(color: number) {
 function buildTrackMeshes(scene: THREE.Scene) {
   // Grass
   const grass = new THREE.Mesh(
-    new THREE.PlaneGeometry(400, 400),
+    new THREE.PlaneGeometry(900, 900),
     new THREE.MeshStandardMaterial({ color: 0x4a7c3a, roughness: 1 }),
   );
   grass.rotation.x = -Math.PI / 2;
@@ -114,32 +114,32 @@ function buildTrackMeshes(scene: THREE.Scene) {
     scene.add(m);
   }
 
-  // Start/finish line at x≈0, z between INNER_RZ and OUTER_RZ on the +z side... use -z
+  // Start/finish line at x≈0, z between INNER_RZ and OUTER_RZ
   const startGroup = new THREE.Group();
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 12; i++) {
     const tile = new THREE.Mesh(
-      new THREE.BoxGeometry(0.8, 0.05, 3.5),
+      new THREE.BoxGeometry(1.2, 0.05, 5),
       new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xffffff : 0x111111 }),
     );
-    tile.position.set(-INNER_RX - 3.5 + i * 0.8, 0.02, 0);
+    tile.position.set(-INNER_RX - 6 + i * 1.2, 0.02, 0);
     startGroup.add(tile);
   }
   scene.add(startGroup);
 
   // Some decorative trees
-  const trunkGeo = new THREE.CylinderGeometry(0.4, 0.5, 2, 8);
+  const trunkGeo = new THREE.CylinderGeometry(0.6, 0.8, 3, 8);
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3a20 });
-  const leafGeo = new THREE.ConeGeometry(2, 4, 10);
+  const leafGeo = new THREE.ConeGeometry(3, 6, 10);
   const leafMat = new THREE.MeshStandardMaterial({ color: 0x2e6b2a });
-  for (let i = 0; i < 40; i++) {
-    const tx = (Math.random() - 0.5) * 360;
-    const tz = (Math.random() - 0.5) * 360;
+  for (let i = 0; i < 90; i++) {
+    const tx = (Math.random() - 0.5) * 820;
+    const tz = (Math.random() - 0.5) * 820;
     // keep trees off the track
-    if (Math.abs(tx) < OUTER_RX + 8 && Math.abs(tz) < OUTER_RZ + 8) continue;
+    if (Math.abs(tx) < OUTER_RX + 15 && Math.abs(tz) < OUTER_RZ + 15) continue;
     const trunk = new THREE.Mesh(trunkGeo, trunkMat);
     const leaves = new THREE.Mesh(leafGeo, leafMat);
-    trunk.position.set(tx, 1, tz);
-    leaves.position.set(tx, 4, tz);
+    trunk.position.set(tx, 1.5, tz);
+    leaves.position.set(tx, 6, tz);
     trunk.castShadow = true;
     leaves.castShadow = true;
     scene.add(trunk);
@@ -152,7 +152,7 @@ export default function RaceGame3D() {
   const keysRef = useRef<Record<string, boolean>>({});
   const carsRef = useRef<CarState[]>([
     {
-      pos: new THREE.Vector3(-INNER_RX - 5, 0, 4),
+      pos: new THREE.Vector3(-INNER_RX - 12, 0, 6),
       angle: 0,
       speed: 0,
       lap: 0,
@@ -160,7 +160,7 @@ export default function RaceGame3D() {
       name: "P1",
     },
     {
-      pos: new THREE.Vector3(-INNER_RX - 5, 0, -4),
+      pos: new THREE.Vector3(-INNER_RX - 12, 0, -6),
       angle: 0,
       speed: 0,
       lap: 0,
@@ -177,7 +177,7 @@ export default function RaceGame3D() {
   const reset = useCallback(() => {
     carsRef.current = [
       {
-        pos: new THREE.Vector3(-INNER_RX - 5, 0, 4),
+        pos: new THREE.Vector3(-INNER_RX - 12, 0, 6),
         angle: 0,
         speed: 0,
         lap: 0,
@@ -185,7 +185,7 @@ export default function RaceGame3D() {
         name: "P1",
       },
       {
-        pos: new THREE.Vector3(-INNER_RX - 5, 0, -4),
+        pos: new THREE.Vector3(-INNER_RX - 12, 0, -6),
         angle: 0,
         speed: 0,
         lap: 0,
@@ -249,19 +249,19 @@ export default function RaceGame3D() {
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x87ceeb, 120, 320);
+    scene.fog = new THREE.Fog(0x87ceeb, 200, 700);
 
     // Lights
     const hemi = new THREE.HemisphereLight(0xffffff, 0x556633, 0.7);
     scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-    sun.position.set(60, 100, 40);
+    sun.position.set(120, 180, 80);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -120;
-    sun.shadow.camera.right = 120;
-    sun.shadow.camera.top = 120;
-    sun.shadow.camera.bottom = -120;
+    sun.shadow.camera.left = -300;
+    sun.shadow.camera.right = 300;
+    sun.shadow.camera.top = 300;
+    sun.shadow.camera.bottom = -300;
     scene.add(sun);
 
     buildTrackMeshes(scene);
@@ -272,8 +272,8 @@ export default function RaceGame3D() {
     scene.add(car2Mesh);
     const carMeshes = [car1Mesh, car2Mesh];
 
-    const cam1 = new THREE.PerspectiveCamera(65, 1, 0.1, 600);
-    const cam2 = new THREE.PerspectiveCamera(65, 1, 0.1, 600);
+    const cam1 = new THREE.PerspectiveCamera(65, 1, 0.1, 900);
+    const cam2 = new THREE.PerspectiveCamera(65, 1, 0.1, 900);
     const cams = [cam1, cam2];
 
     const resize = () => {
@@ -315,10 +315,10 @@ export default function RaceGame3D() {
         if (any(c.left)) turn = -1;
         if (any(c.right)) turn = 1;
 
-        const maxSpeed = 55;
-        const accelRate = 38;
-        const brakeRate = 60;
-        const friction = 14;
+        const maxSpeed = 90;
+        const accelRate = 55;
+        const brakeRate = 75;
+        const friction = 18;
 
         if (accel > 0) car.speed = Math.min(maxSpeed, car.speed + accelRate * dt);
         else if (accel < 0) car.speed = Math.max(-maxSpeed * 0.4, car.speed - brakeRate * dt);
@@ -386,12 +386,12 @@ export default function RaceGame3D() {
       carsRef.current.forEach((car, i) => {
         const fx = Math.cos(car.angle);
         const fz = Math.sin(car.angle);
-        const camDist = 11;
-        const camHeight = 5.5;
+        const camDist = 18;
+        const camHeight = 8;
         const cx = car.pos.x - fx * camDist;
         const cz = car.pos.z - fz * camDist;
         cams[i].position.set(cx, camHeight, cz);
-        cams[i].lookAt(car.pos.x + fx * 5, 1.5, car.pos.z + fz * 5);
+        cams[i].lookAt(car.pos.x + fx * 8, 2, car.pos.z + fz * 8);
       });
 
       // Split-screen rendering
