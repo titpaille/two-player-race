@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import RaceGame from "@/components/RaceGame";
+import RaceGame3D from "@/components/RaceGame3D";
 
 export const Route = createFileRoute("/")({
   component: Index,
 });
 
 function Index() {
-  return <RaceGame />;
+  return <RaceGame3D />;
 }
