@@ -63,7 +63,7 @@ function makeCarMesh(color: number) {
 function buildTrackMeshes(scene: THREE.Scene) {
   // Grass
   const grass = new THREE.Mesh(
-    new THREE.PlaneGeometry(400, 400),
+    new THREE.PlaneGeometry(900, 900),
     new THREE.MeshStandardMaterial({ color: 0x4a7c3a, roughness: 1 }),
   );
   grass.rotation.x = -Math.PI / 2;
