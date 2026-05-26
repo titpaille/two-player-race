@@ -272,8 +272,8 @@ export default function RaceGame3D() {
     scene.add(car2Mesh);
     const carMeshes = [car1Mesh, car2Mesh];
 
-    const cam1 = new THREE.PerspectiveCamera(65, 1, 0.1, 600);
-    const cam2 = new THREE.PerspectiveCamera(65, 1, 0.1, 600);
+    const cam1 = new THREE.PerspectiveCamera(65, 1, 0.1, 900);
+    const cam2 = new THREE.PerspectiveCamera(65, 1, 0.1, 900);
     const cams = [cam1, cam2];
 
     const resize = () => {
