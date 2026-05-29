@@ -315,6 +315,24 @@ const PEBBLE_STUN_TIME = 1.0; // secondes
 // Conversion de la vitesse interne (unités/s) en km/h pour l'affichage
 const SPEED_TO_KMH = 2;
 
+// Pièces à ramasser + boutique d'améliorations
+const COIN_VALUE = 12; // argent gagné par pièce
+const COIN_R = 4; // rayon de ramassage
+const COIN_RESPAWN = 8; // secondes avant réapparition d'une pièce ramassée
+const UPGRADE_MAX = 3; // niveau max par amélioration
+const upgradeCost = (level: number) => 50 + level * 70; // coût du passage au niveau suivant : 50, 120, 190
+const UPGRADE_LIST = [
+  { key: "speed", label: "Vitesse" },
+  { key: "accel", label: "Accélération" },
+  { key: "grip", label: "Tenue de route" },
+] as const;
+type UpgradeKey = (typeof UPGRADE_LIST)[number]["key"];
+type Upgrades = Record<UpgradeKey, number>;
+const UP_SPEED = 10; // +vitesse max par niveau
+const UP_ACCEL = 14; // +accélération par niveau
+const UP_GRIP = 0.13; // +maniabilité par niveau
+const makeUpgrades = (): Upgrades => ({ speed: 0, accel: 0, grip: 0 });
+
 // Voitures : 2 joueurs humains (P1/P2) + bots pilotés par l'IA
 const CAR_DEFS: {
   name: string;
@@ -361,8 +379,26 @@ function makeInitialCars(): CarState[] {
   });
 }
 
-// Roue détaillée : pneu + disque de frein + jante chromée multi-branches
-function makeWheel(): THREE.Group {
+// Style visuel d'une voiture (boutique)
+type CarStyle = {
+  body: number; // couleur carrosserie
+  metalness: number; // finition (0.2 mat → 1 chrome)
+  roughness: number;
+  rim: number; // couleur des jantes
+  glass: number; // teinte des vitres
+  underglow: number; // néon sous la voiture (0 = aucun)
+};
+const botStyle = (color: number): CarStyle => ({
+  body: color,
+  metalness: 0.5,
+  roughness: 0.32,
+  rim: 0xd9dee6,
+  glass: 0x10141c,
+  underglow: 0,
+});
+
+// Roue détaillée : pneu + disque de frein + jante multi-branches (couleur paramétrable)
+function makeWheel(rimColor: number): THREE.Group {
   const g = new THREE.Group();
   const R = 0.56;
   const width = 0.44;
@@ -372,7 +408,7 @@ function makeWheel(): THREE.Group {
     metalness: 0.1,
   });
   const rimMat = new THREE.MeshStandardMaterial({
-    color: 0xd9dee6,
+    color: rimColor,
     metalness: 1,
     roughness: 0.2,
   });
@@ -413,13 +449,13 @@ function makeWheel(): THREE.Group {
   return g;
 }
 
-function makeCarMesh(color: number) {
+function makeCarMesh(style: CarStyle) {
   const group = new THREE.Group();
 
   const bodyMat = new THREE.MeshStandardMaterial({
-    color,
-    metalness: 0.5,
-    roughness: 0.32,
+    color: style.body,
+    metalness: style.metalness,
+    roughness: style.roughness,
   });
   const darkMat = new THREE.MeshStandardMaterial({
     color: 0x0c0c0e,
@@ -427,7 +463,7 @@ function makeCarMesh(color: number) {
     roughness: 0.55,
   });
   const glassMat = new THREE.MeshStandardMaterial({
-    color: 0x10141c,
+    color: style.glass,
     metalness: 0.3,
     roughness: 0.08,
     transparent: true,
@@ -533,13 +569,41 @@ function makeCarMesh(color: number) {
     [-1.32, 0.56, -0.96],
   ];
   wheelPositions.forEach(([x, y, z]) => {
-    const w = makeWheel();
+    const w = makeWheel(style.rim);
     w.position.set(x, y, z);
     group.add(w);
   });
 
+  // Néon sous la voiture (optionnel)
+  if (style.underglow) {
+    const glow = new THREE.Mesh(
+      rb(4.2, 0.06, 2.3, 0.3),
+      new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        emissive: style.underglow,
+        emissiveIntensity: 1.3,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+      }),
+    );
+    glow.position.set(-0.1, 0.12, 0);
+    group.add(glow);
+  }
+
   return group;
 }
+
+// Catalogue de voitures de la boutique (la première est gratuite)
+const CAR_CATALOG: { name: string; price: number; style: CarStyle }[] = [
+  { name: "Argent", price: 0, style: { body: 0xc9ced6, metalness: 0.7, roughness: 0.28, rim: 0xeef2f7, glass: 0x10141c, underglow: 0 } },
+  { name: "Inferno", price: 120, style: { body: 0xe0301f, metalness: 0.5, roughness: 0.28, rim: 0x1a1a1e, glass: 0x14060a, underglow: 0 } },
+  { name: "Azur", price: 120, style: { body: 0x2360ff, metalness: 0.6, roughness: 0.25, rim: 0xeef2f7, glass: 0x081018, underglow: 0 } },
+  { name: "Émeraude", price: 220, style: { body: 0x14c06a, metalness: 0.75, roughness: 0.2, rim: 0xffd23f, glass: 0x06140c, underglow: 0 } },
+  { name: "Or massif", price: 380, style: { body: 0xffc400, metalness: 1.0, roughness: 0.16, rim: 0x2a2a2a, glass: 0x141008, underglow: 0xffae00 } },
+  { name: "Néon", price: 520, style: { body: 0x0c0c16, metalness: 0.3, roughness: 0.5, rim: 0xff2bd6, glass: 0x05050a, underglow: 0xff2bd6 } },
+  { name: "Carbone", price: 460, style: { body: 0x23232c, metalness: 0.45, roughness: 0.45, rim: 0xff3b30, glass: 0x05050a, underglow: 0x00e5ff } },
+];
 
 type Pebble = {
   x: number;
@@ -550,9 +614,11 @@ type Pebble = {
   cooldown: number; // secondes restantes avant de pouvoir être heurté à nouveau
 };
 
+type Coin = { x: number; z: number; mesh: THREE.Mesh; cooldown: number };
 function buildTrackMeshes(scene: THREE.Scene): {
   pebbles: THREE.InstancedMesh;
   pebbleData: Pebble[];
+  coins: Coin[];
 } {
   const pebbleData: Pebble[] = [];
   // Grass
@@ -1389,7 +1455,30 @@ function buildTrackMeshes(scene: THREE.Scene): {
     scene.add(leaves);
   }
 
-  return { pebbles, pebbleData };
+  // Pièces dorées à ramasser le long de la piste (argent)
+  const coins: Coin[] = [];
+  const coinGeo = new THREE.CylinderGeometry(1.6, 1.6, 0.25, 24);
+  const coinMat = new THREE.MeshStandardMaterial({
+    color: 0xffd23f,
+    metalness: 0.9,
+    roughness: 0.25,
+    emissive: 0xb27a00,
+    emissiveIntensity: 0.35,
+  });
+  for (let idx = 0; idx < N; idx += 15) {
+    const t = idx / TRACK_SAMPLES;
+    if (t > 0.6 && t < 0.7) continue; // pas dans le tunnel
+    if (trackIsGap[idx]) continue;
+    const p = trackPoints[idx];
+    const coin = new THREE.Mesh(coinGeo, coinMat);
+    coin.position.set(p.x, trackHeights[idx] + 2.2, p.z);
+    coin.rotation.x = Math.PI / 2;
+    coin.castShadow = true;
+    scene.add(coin);
+    coins.push({ x: p.x, z: p.z, mesh: coin, cooldown: 0 });
+  }
+
+  return { pebbles, pebbleData, coins };
 }
 
 const MINIMAP_PATH =
@@ -1461,17 +1550,56 @@ export default function RaceGame3D() {
   const mountRef = useRef<HTMLDivElement>(null);
   const keysRef = useRef<Record<string, boolean>>({});
   const carsRef = useRef<CarState[]>(makeInitialCars());
+  // Argent, améliorations et voitures par joueur (persistants entre les courses de la session)
+  const moneyRef = useRef<[number, number]>([0, 0]);
+  const upgradesRef = useRef<Upgrades[]>([makeUpgrades(), makeUpgrades()]);
+  // P1 démarre avec la rouge (Inferno), P2 avec la bleue (Azur) — couleurs d'identité
+  const ownedCarsRef = useRef<Set<number>[]>([new Set([1]), new Set([2])]);
+  const selectedCarRef = useRef<[number, number]>([1, 2]);
   const [tick, setTick] = useState(0);
+  const [shopTick, setShopTick] = useState(0);
   const [winner, setWinner] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [gpuError, setGpuError] = useState<string | null>(null);
 
+  // Lance une course (réinitialise positions, garde argent/améliorations)
   const reset = useCallback(() => {
     carsRef.current = makeInitialCars();
     setWinner(null);
     setRunning(false);
     setCountdown(3);
+  }, []);
+
+  // Retour à la boutique (entre deux courses)
+  const backToShop = useCallback(() => {
+    setWinner(null);
+    setRunning(false);
+    setCountdown(null);
+  }, []);
+
+  const buyUpgrade = useCallback((player: number, key: UpgradeKey) => {
+    const up = upgradesRef.current[player];
+    const lvl = up[key];
+    if (lvl >= UPGRADE_MAX) return;
+    const cost = upgradeCost(lvl);
+    if (moneyRef.current[player] < cost) return;
+    moneyRef.current[player] -= cost;
+    up[key] = lvl + 1;
+    setShopTick((t) => t + 1);
+  }, []);
+
+  // Achète (si possible) puis sélectionne une voiture ; si déjà possédée, sélectionne juste
+  const selectOrBuyCar = useCallback((player: number, idx: number) => {
+    const owned = ownedCarsRef.current[player];
+    if (!owned.has(idx)) {
+      const price = CAR_CATALOG[idx].price;
+      if (moneyRef.current[player] < price) return;
+      moneyRef.current[player] -= price;
+      owned.add(idx);
+    }
+    selectedCarRef.current[player] = idx;
+    setShopTick((t) => t + 1);
   }, []);
 
   useEffect(() => {
@@ -1571,7 +1699,7 @@ export default function RaceGame3D() {
     scene.environment = envTex;
     pmrem.dispose();
 
-    const { pebbleData } = buildTrackMeshes(scene);
+    const { pebbleData, coins } = buildTrackMeshes(scene);
 
     // Particules d'explosion
     type Particle = {
@@ -1612,8 +1740,13 @@ export default function RaceGame3D() {
       }
     };
 
-    const carMeshes = CAR_DEFS.map((def) => {
-      const m = makeCarMesh(def.color);
+    const carMeshes = CAR_DEFS.map((def, k) => {
+      // Joueurs humains : voiture choisie en boutique ; bots : style par défaut
+      const style =
+        !def.bot && k < 2
+          ? CAR_CATALOG[selectedCarRef.current[k]].style
+          : botStyle(def.color);
+      const m = makeCarMesh(style);
       scene.add(m);
       return m;
     });
@@ -1682,10 +1815,13 @@ export default function RaceGame3D() {
           if (any(c.boost)) wantsBoost = true;
         }
 
-        const normalMax = 90 * car.speedFactor;
+        // Améliorations achetées en boutique (humains uniquement)
+        const up = car.isBot ? null : upgradesRef.current[i];
+        const normalMax = (90 + (up ? up.speed * UP_SPEED : 0)) * car.speedFactor;
         const boosting = wantsBoost && car.nitro > 0 && car.speed >= 0;
         car.boosting = boosting;
-        const accelRate = boosting ? NITRO_ACCEL : 55;
+        const baseAccel = 55 + (up ? up.accel * UP_ACCEL : 0);
+        const accelRate = boosting ? NITRO_ACCEL : baseAccel;
         const brakeRate = 75;
         const friction = 18;
 
@@ -1716,7 +1852,8 @@ export default function RaceGame3D() {
           );
         }
 
-        const turnRate = 1.8 * Math.min(1, car.speed / normalMax);
+        const gripMul = 1 + (up ? up.grip * UP_GRIP : 0);
+        const turnRate = 1.8 * gripMul * Math.min(1, car.speed / normalMax);
         car.angle += turn * turnRate * dt;
 
         // In 3D: forward is +x in car local; rotate around Y
@@ -1825,6 +1962,20 @@ export default function RaceGame3D() {
           }
         }
 
+        // Ramassage des pièces (humains uniquement, près du sol)
+        if (!car.isBot && car.pos.y - targetY < 2.0) {
+          for (const coin of coins) {
+            if (coin.cooldown > 0) continue;
+            const dx = coin.x - car.pos.x;
+            const dz = coin.z - car.pos.z;
+            if (dx * dx + dz * dz < COIN_R * COIN_R) {
+              moneyRef.current[i] += COIN_VALUE;
+              coin.mesh.visible = false;
+              coin.cooldown = COIN_RESPAWN;
+            }
+          }
+        }
+
         // Respawn si on est tombé dans le vide
         if (car.pos.y < -40) {
           const safeP = trackPoints[car.lastSafeIdx];
@@ -1868,6 +2019,15 @@ export default function RaceGame3D() {
         carMeshes[i].position.set(car.pos.x, car.pos.y, car.pos.z);
         carMeshes[i].rotation.y = -car.angle;
       });
+
+      // Pièces : rotation continue + réapparition après ramassage
+      for (const coin of coins) {
+        if (coin.cooldown > 0) {
+          coin.cooldown -= dt;
+          if (coin.cooldown <= 0) coin.mesh.visible = true;
+        }
+        coin.mesh.rotation.y += dt * 3;
+      }
 
       // Mise à jour des particules d'explosion
       for (let pi = particles.length - 1; pi >= 0; pi--) {
@@ -1954,6 +2114,7 @@ export default function RaceGame3D() {
 
   const cars = carsRef.current;
   void tick;
+  void shopTick;
   // Classement : progression = tours + position le long de la centerline
   const _ranking = cars
     .map((c, i) => ({
@@ -1979,7 +2140,8 @@ export default function RaceGame3D() {
         <div className="pointer-events-none absolute top-2 left-2 md:left-2 md:top-2 px-3 py-1.5 rounded-md bg-black/55 backdrop-blur text-white text-sm font-semibold">
           <span className="inline-block w-2.5 h-2.5 rounded-sm mr-2 align-middle" style={{ background: "#e04030" }} />
           P1 · Tour {Math.min(cars[0].lap + 1, TOTAL_LAPS)}/{TOTAL_LAPS} · {posOf(0)}
-          <sup>e</sup>/{cars.length}
+          <sup>e</sup>/{cars.length}{" "}
+          <span style={{ color: "#ffd23f" }}>· {moneyRef.current[0]} $</span>
           <div className="mt-0.5 text-lg font-bold tabular-nums leading-none">
             {Math.round(Math.abs(cars[0].speed) * SPEED_TO_KMH)}{" "}
             <span className="text-xs font-medium opacity-80">km/h</span>
@@ -1999,7 +2161,8 @@ export default function RaceGame3D() {
         <div className="pointer-events-none absolute top-2 right-2 px-3 py-1.5 rounded-md bg-black/55 backdrop-blur text-white text-sm font-semibold">
           <span className="inline-block w-2.5 h-2.5 rounded-sm mr-2 align-middle" style={{ background: "#3a8bff" }} />
           P2 · Tour {Math.min(cars[1].lap + 1, TOTAL_LAPS)}/{TOTAL_LAPS} · {posOf(1)}
-          <sup>e</sup>/{cars.length}
+          <sup>e</sup>/{cars.length}{" "}
+          <span style={{ color: "#ffd23f" }}>· {moneyRef.current[1]} $</span>
           <div className="mt-0.5 text-lg font-bold tabular-nums leading-none">
             {Math.round(Math.abs(cars[1].speed) * SPEED_TO_KMH)}{" "}
             <span className="text-xs font-medium opacity-80">km/h</span>
@@ -2036,10 +2199,10 @@ export default function RaceGame3D() {
               <div className="text-center">
                 <div className="text-4xl md:text-5xl font-bold mb-4 text-white">🏁 {winner} gagne !</div>
                 <button
-                  onClick={reset}
+                  onClick={backToShop}
                   className="px-6 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:opacity-90"
                 >
-                  Rejouer
+                  Continuer (boutique)
                 </button>
               </div>
             ) : countdown !== null ? (
@@ -2047,12 +2210,111 @@ export default function RaceGame3D() {
                 {countdown === 0 ? "GO!" : countdown}
               </div>
             ) : (
-              <button
-                onClick={reset}
-                className="px-8 py-4 rounded-md bg-primary text-primary-foreground text-xl font-medium hover:opacity-90"
-              >
-                Démarrer la course
-              </button>
+              <div className="text-center text-white w-full max-w-5xl px-4 max-h-[88vh] overflow-y-auto">
+                <div className="text-2xl md:text-3xl font-bold mb-1">Boutique</div>
+                <p className="text-xs text-white/70 mb-5">
+                  Ramassez les pièces dorées sur la piste, puis dépensez votre argent en voitures et améliorations.
+                </p>
+                <div className="flex flex-col md:flex-row gap-4 justify-center mb-6">
+                  {[0, 1].map((player) => (
+                    <div key={player} className="flex-1 rounded-lg bg-white/10 p-4 text-left">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="font-semibold">
+                          <span
+                            className="inline-block w-2.5 h-2.5 rounded-sm mr-2 align-middle"
+                            style={{ background: player === 0 ? "#e04030" : "#3a8bff" }}
+                          />
+                          {player === 0 ? "P1" : "P2"}
+                        </span>
+                        <span style={{ color: "#ffd23f" }} className="font-bold tabular-nums">
+                          {moneyRef.current[player]} $
+                        </span>
+                      </div>
+
+                      {/* Choix / achat de voiture */}
+                      <div className="text-[11px] uppercase tracking-wide text-white/55 mb-1.5">
+                        Voiture
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
+                        {CAR_CATALOG.map((c, idx) => {
+                          const owned = ownedCarsRef.current[player].has(idx);
+                          const selected = selectedCarRef.current[player] === idx;
+                          const afford = moneyRef.current[player] >= c.price;
+                          const bodyCss = "#" + c.style.body.toString(16).padStart(6, "0");
+                          const glowCss =
+                            "#" + c.style.underglow.toString(16).padStart(6, "0");
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => selectOrBuyCar(player, idx)}
+                              disabled={!owned && !afford}
+                              className={`shrink-0 w-[4.6rem] rounded-md p-1.5 border-2 transition disabled:opacity-40 ${
+                                selected ? "border-white" : "border-white/10"
+                              }`}
+                              style={{ background: "rgba(255,255,255,0.07)" }}
+                            >
+                              <div
+                                className="h-7 rounded mb-1"
+                                style={{
+                                  background: `linear-gradient(135deg, ${bodyCss}, rgba(255,255,255,0.45) 55%, ${bodyCss})`,
+                                  boxShadow: c.style.underglow
+                                    ? `0 0 8px ${glowCss}`
+                                    : "none",
+                                }}
+                              />
+                              <div className="text-[10px] font-semibold leading-tight">
+                                {c.name}
+                              </div>
+                              <div className="text-[10px] text-white/70">
+                                {selected
+                                  ? "Équipée"
+                                  : owned
+                                    ? "Choisir"
+                                    : `${c.price} $`}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="text-[11px] uppercase tracking-wide text-white/55 mb-1.5">
+                        Améliorations
+                      </div>
+                      <div className="space-y-2">
+                        {UPGRADE_LIST.map((u) => {
+                          const lvl = upgradesRef.current[player][u.key];
+                          const maxed = lvl >= UPGRADE_MAX;
+                          const cost = upgradeCost(lvl);
+                          const afford = moneyRef.current[player] >= cost;
+                          return (
+                            <div key={u.key} className="flex items-center justify-between gap-2">
+                              <span className="text-sm">
+                                {u.label}{" "}
+                                <span className="text-white/60">
+                                  Nv {lvl}/{UPGRADE_MAX}
+                                </span>
+                              </span>
+                              <button
+                                disabled={maxed || !afford}
+                                onClick={() => buyUpgrade(player, u.key)}
+                                className="px-2.5 py-1 rounded text-xs font-medium bg-primary text-primary-foreground disabled:opacity-40"
+                              >
+                                {maxed ? "Max" : `${cost} $`}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={reset}
+                  className="px-8 py-4 rounded-md bg-primary text-primary-foreground text-xl font-medium hover:opacity-90"
+                >
+                  Démarrer la course
+                </button>
+              </div>
             )}
           </div>
         )}
