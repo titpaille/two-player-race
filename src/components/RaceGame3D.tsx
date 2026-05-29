@@ -297,7 +297,23 @@ type CarState = {
   name: string;
   isBot: boolean; // piloté par l'IA
   speedFactor: number; // multiplicateur de vitesse max (variété/difficulté)
+  nitro: number; // réserve de nitro accumulée (0..NITRO_MAX)
+  boosting: boolean; // nitro en cours d'utilisation cette frame
+  stunned: number; // secondes restantes d'immobilisation (choc caillou)
 };
+
+// Nitro : se remplit en roulant vite, propulse la voiture quand on l'utilise
+const NITRO_MAX = 100;
+const NITRO_GAIN = 16; // par seconde, à pleine vitesse
+const NITRO_DRAIN = 34; // par seconde pendant le boost
+const NITRO_SPEED_MULT = 2.0; // vitesse max multipliée sous nitro
+const NITRO_ACCEL = 170; // accélération sous nitro
+
+// Immobilisation quand on percute un caillou
+const PEBBLE_STUN_TIME = 1.0; // secondes
+
+// Conversion de la vitesse interne (unités/s) en km/h pour l'affichage
+const SPEED_TO_KMH = 2;
 
 // Voitures : 2 joueurs humains (P1/P2) + bots pilotés par l'IA
 const CAR_DEFS: {
@@ -338,6 +354,9 @@ function makeInitialCars(): CarState[] {
       name: def.name,
       isBot: def.bot,
       speedFactor: def.speedFactor,
+      nitro: 0,
+      boosting: false,
+      stunned: 0,
     };
   });
 }
@@ -1469,6 +1488,7 @@ export default function RaceGame3D() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       keysRef.current[e.key.toLowerCase()] = true;
+      keysRef.current[e.code.toLowerCase()] = true; // ex. "shiftleft"/"shiftright" pour le nitro
       if (
         ["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(
           e.key.toLowerCase(),
@@ -1479,6 +1499,7 @@ export default function RaceGame3D() {
     };
     const up = (e: KeyboardEvent) => {
       keysRef.current[e.key.toLowerCase()] = false;
+      keysRef.current[e.code.toLowerCase()] = false;
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -1625,15 +1646,20 @@ export default function RaceGame3D() {
       if (!running || winner) return;
 
       const controls = [
-        { up: ["z", "w"], down: ["s"], left: ["q", "a"], right: ["d"] },
-        { up: ["arrowup"], down: ["arrowdown"], left: ["arrowleft"], right: ["arrowright"] },
+        { up: ["z", "w"], down: ["s"], left: ["q", "a"], right: ["d"], boost: ["shiftleft"] },
+        { up: ["arrowup"], down: ["arrowdown"], left: ["arrowleft"], right: ["arrowright"], boost: ["shiftright"] },
       ];
 
       cars.forEach((car, i) => {
         const k = keysRef.current;
+        const stunned = car.stunned > 0;
+        if (stunned) car.stunned = Math.max(0, car.stunned - dt);
         let accel = 0;
         let turn = 0;
-        if (car.isBot) {
+        let wantsBoost = false;
+        if (stunned) {
+          // immobilisée par un caillou : aucune commande ne répond
+        } else if (car.isBot) {
           // IA : vise un point de la centerline en avant et s'oriente vers lui
           const ni = nearestSampleIndex(car.pos.x, car.pos.z);
           const t = trackPoints[(ni + 7) % TRACK_SAMPLES];
@@ -1644,6 +1670,8 @@ export default function RaceGame3D() {
           const ae = Math.abs(err);
           // freine dans les virages serrés, lève le pied en courbe, plein gaz en ligne droite
           accel = ae > 0.8 ? -1 : ae > 0.45 ? 0 : 1;
+          // les bots lâchent le nitro en ligne droite
+          wantsBoost = accel > 0;
         } else {
           const c = controls[i];
           const any = (arr: string[]) => arr.some((x) => k[x]);
@@ -1651,21 +1679,44 @@ export default function RaceGame3D() {
           if (any(c.down)) accel = -1;
           if (any(c.left)) turn = -1;
           if (any(c.right)) turn = 1;
+          if (any(c.boost)) wantsBoost = true;
         }
 
-        const maxSpeed = 90 * car.speedFactor;
-        const accelRate = 55;
+        const normalMax = 90 * car.speedFactor;
+        const boosting = wantsBoost && car.nitro > 0 && car.speed >= 0;
+        car.boosting = boosting;
+        const accelRate = boosting ? NITRO_ACCEL : 55;
         const brakeRate = 75;
         const friction = 18;
 
-        if (accel > 0) car.speed = Math.min(maxSpeed, car.speed + accelRate * dt);
-        else if (accel < 0) car.speed = Math.max(-maxSpeed * 0.4, car.speed - brakeRate * dt);
-        else {
+        if (boosting) {
+          // le nitro propulse vers l'avant au-delà de la vitesse normale
+          const maxSpeed = normalMax * NITRO_SPEED_MULT;
+          car.speed = Math.min(maxSpeed, car.speed + accelRate * dt);
+          car.nitro = Math.max(0, car.nitro - NITRO_DRAIN * dt);
+        } else if (accel > 0) {
+          // au-dessus de la vitesse normale (sortie de boost) : on redescend doucement
+          if (car.speed > normalMax) car.speed = Math.max(normalMax, car.speed - friction * dt);
+          else car.speed = Math.min(normalMax, car.speed + accelRate * dt);
+        } else if (accel < 0) {
+          car.speed = Math.max(-normalMax * 0.4, car.speed - brakeRate * dt);
+        } else {
           if (car.speed > 0) car.speed = Math.max(0, car.speed - friction * dt);
           else car.speed = Math.min(0, car.speed + friction * dt);
         }
 
-        const turnRate = 1.8 * (car.speed / maxSpeed);
+        // Immobilisée : arrêt net (les commandes sont déjà neutralisées plus haut)
+        if (stunned) car.speed = 0;
+
+        // Accumulation du nitro en roulant (hors boost)
+        if (!boosting && car.speed > 0) {
+          car.nitro = Math.min(
+            NITRO_MAX,
+            car.nitro + NITRO_GAIN * (car.speed / normalMax) * dt,
+          );
+        }
+
+        const turnRate = 1.8 * Math.min(1, car.speed / normalMax);
         car.angle += turn * turnRate * dt;
 
         // In 3D: forward is +x in car local; rotate around Y
@@ -1754,10 +1805,21 @@ export default function RaceGame3D() {
             const dz = pb.z - car.pos.z;
             const r = 1.7 + pb.size;
             if (dx * dx + dz * dz < r * r) {
-              pb.cooldown = 0.6;
-              car.speed *= 0.55;
-              car.angle += (Math.random() - 0.5) * 0.18;
-              car.vy = Math.max(car.vy, 3);
+              // arrête net la voiture et l'immobilise 1 seconde
+              pb.cooldown = PEBBLE_STUN_TIME + 0.3;
+              car.speed = 0;
+              car.stunned = PEBBLE_STUN_TIME;
+              // repousse la voiture hors du rayon du caillou pour ne pas rester coincée
+              let outX = -dx;
+              let outZ = -dz; // du caillou vers la voiture
+              let d = Math.hypot(outX, outZ);
+              if (d < 1e-3) {
+                outX = -Math.cos(car.angle);
+                outZ = -Math.sin(car.angle);
+                d = 1;
+              }
+              car.pos.x = pb.x + (outX / d) * (r + 0.5);
+              car.pos.z = pb.z + (outZ / d) * (r + 0.5);
               spawnExplosion(pb.x, pb.y + pb.size * 0.6, pb.z);
             }
           }
@@ -1841,6 +1903,12 @@ export default function RaceGame3D() {
         const cz = car.pos.z - fz * camDist;
         cam.position.set(cx, car.pos.y + camHeight, cz);
         cam.lookAt(car.pos.x + fx * 8, car.pos.y + 2, car.pos.z + fz * 8);
+        // léger élargissement du champ de vision sous nitro
+        const targetFov = car.boosting ? 80 : 65;
+        if (Math.abs(cam.fov - targetFov) > 0.05) {
+          cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 8);
+          cam.updateProjectionMatrix();
+        }
       });
 
       // Split-screen rendering
@@ -1900,7 +1968,7 @@ export default function RaceGame3D() {
       <header className="flex flex-col items-center py-3 gap-1">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Course 3D — 2 joueurs</h1>
         <p className="text-xs text-muted-foreground">
-          Premier à {TOTAL_LAPS} tours gagne · P1 : Z Q S D · P2 : Flèches · vs 3 bots
+          Premier à {TOTAL_LAPS} tours gagne · P1 : ZQSD + Maj gauche (nitro) · P2 : Flèches + Maj droite (nitro) · vs 3 bots
         </p>
       </header>
 
@@ -1912,12 +1980,40 @@ export default function RaceGame3D() {
           <span className="inline-block w-2.5 h-2.5 rounded-sm mr-2 align-middle" style={{ background: "#e04030" }} />
           P1 · Tour {Math.min(cars[0].lap + 1, TOTAL_LAPS)}/{TOTAL_LAPS} · {posOf(0)}
           <sup>e</sup>/{cars.length}
+          <div className="mt-0.5 text-lg font-bold tabular-nums leading-none">
+            {Math.round(Math.abs(cars[0].speed) * SPEED_TO_KMH)}{" "}
+            <span className="text-xs font-medium opacity-80">km/h</span>
+          </div>
+          <div className="mt-1 h-1.5 w-full rounded-full bg-white/20 overflow-hidden">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${(cars[0].nitro / NITRO_MAX) * 100}%`,
+                background: cars[0].nitro >= NITRO_MAX ? "#22e3ff" : "#0ea5e9",
+                boxShadow: cars[0].nitro >= NITRO_MAX ? "0 0 6px #22e3ff" : "none",
+              }}
+            />
+          </div>
         </div>
         {/* HUD P2 — top-right on horizontal split, bottom-left on vertical */}
         <div className="pointer-events-none absolute top-2 right-2 px-3 py-1.5 rounded-md bg-black/55 backdrop-blur text-white text-sm font-semibold">
           <span className="inline-block w-2.5 h-2.5 rounded-sm mr-2 align-middle" style={{ background: "#3a8bff" }} />
           P2 · Tour {Math.min(cars[1].lap + 1, TOTAL_LAPS)}/{TOTAL_LAPS} · {posOf(1)}
           <sup>e</sup>/{cars.length}
+          <div className="mt-0.5 text-lg font-bold tabular-nums leading-none">
+            {Math.round(Math.abs(cars[1].speed) * SPEED_TO_KMH)}{" "}
+            <span className="text-xs font-medium opacity-80">km/h</span>
+          </div>
+          <div className="mt-1 h-1.5 w-full rounded-full bg-white/20 overflow-hidden">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${(cars[1].nitro / NITRO_MAX) * 100}%`,
+                background: cars[1].nitro >= NITRO_MAX ? "#22e3ff" : "#0ea5e9",
+                boxShadow: cars[1].nitro >= NITRO_MAX ? "0 0 6px #22e3ff" : "none",
+              }}
+            />
+          </div>
         </div>
 
         {/* Mini-map P1 (bas gauche) */}
