@@ -380,7 +380,9 @@ function makeInitialCars(): CarState[] {
 }
 
 // Style visuel d'une voiture (boutique)
+type CarShape = "sport" | "muscle" | "pickup" | "f1" | "buggy";
 type CarStyle = {
+  shape: CarShape; // type de carrosserie
   body: number; // couleur carrosserie
   metalness: number; // finition (0.2 mat → 1 chrome)
   roughness: number;
@@ -389,6 +391,7 @@ type CarStyle = {
   underglow: number; // néon sous la voiture (0 = aucun)
 };
 const botStyle = (color: number): CarStyle => ({
+  shape: "sport",
   body: color,
   metalness: 0.5,
   roughness: 0.32,
@@ -484,92 +487,103 @@ function makeCarMesh(style: CarStyle) {
 
   const rb = (w: number, h: number, d: number, r: number) =>
     new RoundedBoxGeometry(w, h, d, 3, r);
+  const box = (w: number, h: number, d: number) =>
+    new THREE.BoxGeometry(w, h, d);
+  const add = (
+    geo: THREE.BufferGeometry,
+    mat: THREE.Material,
+    x: number,
+    y: number,
+    z: number,
+  ) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    group.add(m);
+  };
 
-  // Coque principale basse et large
-  const body = new THREE.Mesh(rb(3.5, 0.55, 1.9, 0.2), bodyMat);
-  body.position.set(0, 0.7, 0);
-  body.castShadow = true;
-  group.add(body);
+  let wheels: number[][] = [];
+  let wheelScale = 1;
 
-  // Nez plongeant
-  const nose = new THREE.Mesh(rb(1.4, 0.4, 1.78, 0.18), bodyMat);
-  nose.position.set(1.55, 0.6, 0);
-  nose.castShadow = true;
-  group.add(nose);
+  if (style.shape === "sport") {
+    add(rb(3.5, 0.55, 1.9, 0.2), bodyMat, 0, 0.7, 0);
+    add(rb(1.4, 0.4, 1.78, 0.18), bodyMat, 1.55, 0.6, 0); // nez
+    add(rb(0.9, 0.5, 1.85, 0.18), bodyMat, -1.5, 0.7, 0); // arrière
+    add(rb(2.0, 0.6, 1.5, 0.28), glassMat, -0.25, 1.2, 0); // bulle vitrée
+    add(rb(0.8, 0.18, 1.35, 0.08), bodyMat, -0.55, 1.5, 0); // arceau toit
+    add(rb(0.5, 0.1, 1.9, 0.04), darkMat, 2.05, 0.4, 0); // splitter
+    add(rb(0.5, 0.18, 1.8, 0.05), darkMat, -1.95, 0.42, 0); // diffuseur
+    [0.92, -0.92].forEach((z) => add(rb(2.8, 0.12, 0.12, 0.05), darkMat, 0, 0.42, z));
+    [0.62, -0.62].forEach((z) => add(rb(0.12, 0.16, 0.5, 0.05), headlightMat, 2.18, 0.72, z));
+    add(rb(0.1, 0.16, 1.5, 0.04), taillightMat, -1.97, 0.85, 0);
+    [0.6, -0.6].forEach((z) => add(box(0.1, 0.32, 0.08), darkMat, -1.7, 1.15, z)); // pieds aileron
+    add(rb(0.5, 0.07, 1.5, 0.03), darkMat, -1.75, 1.34, 0); // aileron
+    [0.85, -0.85].forEach((z) => {
+      add(box(0.12, 0.06, 0.18), darkMat, 0.5, 1.12, z);
+      add(rb(0.16, 0.12, 0.1, 0.04), bodyMat, 0.5, 1.16, z * 1.12);
+    });
+    wheels = [[1.32, 0.56, 0.96], [1.32, 0.56, -0.96], [-1.32, 0.56, 0.96], [-1.32, 0.56, -0.96]];
+  } else if (style.shape === "muscle") {
+    add(rb(4.0, 0.62, 2.0, 0.16), bodyMat, 0, 0.84, 0);
+    add(rb(1.7, 0.4, 1.96, 0.1), bodyMat, 1.45, 0.82, 0); // long capot
+    add(rb(0.7, 0.28, 0.6, 0.06), darkMat, 1.2, 1.12, 0); // prise d'air capot
+    add(rb(1.5, 0.55, 1.86, 0.12), glassMat, -0.25, 1.42, 0); // habitacle
+    add(rb(1.3, 0.16, 1.7, 0.08), bodyMat, -0.45, 1.68, 0); // toit
+    add(rb(1.1, 0.55, 2.0, 0.14), bodyMat, -1.7, 0.95, 0); // arrière haut
+    add(rb(0.45, 0.12, 2.0, 0.04), darkMat, 2.1, 0.55, 0); // splitter
+    add(rb(0.2, 0.18, 2.0, 0.05), darkMat, -2.0, 1.05, 0); // lèvre arrière
+    [0.72, -0.72].forEach((z) => add(rb(0.14, 0.2, 0.5, 0.05), headlightMat, 2.22, 0.92, z));
+    add(rb(0.1, 0.22, 1.95, 0.04), taillightMat, -2.0, 1.15, 0);
+    [0.55, -0.55].forEach((z) => add(box(0.4, 0.18, 0.18), darkMat, -2.15, 0.55, z)); // échappements
+    wheels = [[1.5, 0.63, 1.03], [1.5, 0.63, -1.03], [-1.5, 0.63, 1.03], [-1.5, 0.63, -1.03]];
+    wheelScale = 1.12;
+  } else if (style.shape === "pickup") {
+    add(rb(1.3, 0.5, 2.0, 0.1), bodyMat, 1.55, 0.95, 0); // capot
+    add(rb(1.5, 1.0, 2.0, 0.12), bodyMat, 0.35, 1.3, 0); // cabine
+    add(rb(1.3, 0.5, 1.86, 0.08), glassMat, 0.35, 1.6, 0); // vitres cabine
+    add(rb(2.3, 0.2, 1.96, 0.05), bodyMat, -1.15, 0.95, 0); // plancher benne
+    [0.9, -0.9].forEach((z) => add(rb(2.3, 0.45, 0.14, 0.04), bodyMat, -1.15, 1.22, z)); // ridelles
+    add(rb(0.14, 0.45, 1.96, 0.04), bodyMat, 0.0, 1.22, 0); // paroi avant benne
+    add(rb(0.14, 0.45, 1.96, 0.04), bodyMat, -2.3, 1.22, 0); // hayon
+    add(rb(0.3, 0.4, 2.0, 0.06), darkMat, 2.25, 0.8, 0); // pare-chocs
+    [0.7, -0.7].forEach((z) => add(rb(0.14, 0.22, 0.46, 0.05), headlightMat, 2.2, 1.0, z));
+    [0.7, -0.7].forEach((z) => add(rb(0.1, 0.2, 0.4, 0.04), taillightMat, -2.38, 1.1, z));
+    wheels = [[1.45, 0.66, 1.06], [1.45, 0.66, -1.06], [-1.4, 0.66, 1.06], [-1.4, 0.66, -1.06]];
+    wheelScale = 1.18;
+  } else if (style.shape === "f1") {
+    add(rb(3.4, 0.3, 0.8, 0.08), bodyMat, 0, 0.6, 0); // coque étroite
+    add(rb(1.6, 0.26, 0.5, 0.1), bodyMat, 1.9, 0.56, 0); // nez
+    add(box(0.7, 0.3, 0.5), darkMat, 0.1, 0.78, 0); // baquet cockpit
+    add(rb(0.5, 0.5, 0.55, 0.12), bodyMat, -0.55, 0.95, 0); // arceau / airbox
+    add(rb(1.3, 0.22, 0.18, 0.05), bodyMat, -1.0, 0.92, 0); // aileron de requin
+    [0.6, -0.6].forEach((z) => add(rb(1.5, 0.36, 0.46, 0.1), bodyMat, 0.15, 0.62, z)); // pontons
+    add(rb(0.55, 0.07, 2.5, 0.03), darkMat, 2.5, 0.42, 0); // aileron avant
+    [1.2, -1.2].forEach((z) => add(box(0.5, 0.34, 0.06), darkMat, 2.5, 0.5, z)); // dérives avant
+    [0.4, -0.4].forEach((z) => add(box(0.1, 0.5, 0.08), darkMat, -1.85, 1.05, z)); // mâts aileron
+    add(rb(0.6, 0.1, 2.1, 0.03), darkMat, -1.9, 1.32, 0); // aileron arrière
+    [1.05, -1.05].forEach((z) => add(box(0.5, 0.34, 0.06), darkMat, -1.9, 1.3, z)); // dérives arrière
+    add(rb(0.1, 0.12, 0.7, 0.03), taillightMat, -2.0, 0.6, 0);
+    wheels = [[1.45, 0.64, 1.2], [1.45, 0.64, -1.2], [-1.45, 0.64, 1.2], [-1.45, 0.64, -1.2]];
+    wheelScale = 1.15;
+  } else {
+    // buggy / tout-terrain
+    add(rb(2.4, 0.6, 1.5, 0.18), bodyMat, 0, 1.05, 0); // coque
+    add(rb(0.9, 0.4, 1.4, 0.12), bodyMat, 1.45, 0.95, 0); // nez
+    add(rb(0.95, 0.32, 1.15, 0.06), darkMat, 0.0, 1.4, 0); // sièges
+    ([[0.45, 0.66], [0.45, -0.66], [-0.8, 0.66], [-0.8, -0.66]] as number[][]).forEach(
+      ([x, z]) => add(box(0.1, 0.95, 0.1), darkMat, x, 1.7, z),
+    ); // montants d'arceau
+    [0.66, -0.66].forEach((z) => add(box(1.35, 0.1, 0.1), darkMat, -0.18, 2.12, z)); // barres long.
+    [0.45, -0.8].forEach((x) => add(box(0.1, 0.1, 1.42), darkMat, x, 2.12, 0)); // barres trav.
+    [0.4, 0, -0.4].forEach((z) => add(rb(0.22, 0.22, 0.16, 0.05), headlightMat, 1.5, 1.55, z)); // rampe de phares
+    add(rb(0.1, 0.18, 1.3, 0.04), taillightMat, -1.6, 1.15, 0);
+    wheels = [[1.2, 0.84, 1.02], [1.2, 0.84, -1.02], [-1.2, 0.84, 1.02], [-1.2, 0.84, -1.02]];
+    wheelScale = 1.5;
+  }
 
-  // Arrière
-  const tail = new THREE.Mesh(rb(0.9, 0.5, 1.85, 0.18), bodyMat);
-  tail.position.set(-1.5, 0.7, 0);
-  tail.castShadow = true;
-  group.add(tail);
-
-  // Cockpit / bulle vitrée arrondie, reculée
-  const canopy = new THREE.Mesh(rb(2.0, 0.6, 1.5, 0.28), glassMat);
-  canopy.position.set(-0.25, 1.2, 0);
-  group.add(canopy);
-
-  // Arceau de toit teinté carrosserie
-  const roof = new THREE.Mesh(rb(0.8, 0.18, 1.35, 0.08), bodyMat);
-  roof.position.set(-0.55, 1.5, 0);
-  group.add(roof);
-
-  // Splitter avant + diffuseur arrière
-  const splitter = new THREE.Mesh(rb(0.5, 0.1, 1.9, 0.04), darkMat);
-  splitter.position.set(2.05, 0.4, 0);
-  group.add(splitter);
-  const diffuser = new THREE.Mesh(rb(0.5, 0.18, 1.8, 0.05), darkMat);
-  diffuser.position.set(-1.95, 0.42, 0);
-  group.add(diffuser);
-
-  // Bas de caisse
-  [0.92, -0.92].forEach((z) => {
-    const sk = new THREE.Mesh(rb(2.8, 0.12, 0.12, 0.05), darkMat);
-    sk.position.set(0, 0.42, z);
-    group.add(sk);
-  });
-
-  // Phares avant
-  const hlGeo = rb(0.12, 0.16, 0.5, 0.05);
-  [0.62, -0.62].forEach((z) => {
-    const h = new THREE.Mesh(hlGeo, headlightMat);
-    h.position.set(2.18, 0.72, z);
-    group.add(h);
-  });
-
-  // Bande de feux arrière
-  const tl = new THREE.Mesh(rb(0.1, 0.16, 1.5, 0.04), taillightMat);
-  tl.position.set(-1.97, 0.85, 0);
-  group.add(tl);
-
-  // Aileron arrière
-  [0.6, -0.6].forEach((z) => {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.32, 0.08), darkMat);
-    leg.position.set(-1.7, 1.15, z);
-    group.add(leg);
-  });
-  const wing = new THREE.Mesh(rb(0.5, 0.07, 1.5, 0.03), darkMat);
-  wing.position.set(-1.75, 1.34, 0);
-  group.add(wing);
-
-  // Rétroviseurs
-  [0.85, -0.85].forEach((z) => {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 0.18), darkMat);
-    arm.position.set(0.5, 1.12, z);
-    group.add(arm);
-    const cap = new THREE.Mesh(rb(0.16, 0.12, 0.1, 0.04), bodyMat);
-    cap.position.set(0.5, 1.16, z * 1.12);
-    group.add(cap);
-  });
-
-  // Roues aux quatre coins (légèrement débordantes, style sport)
-  const wheelPositions: [number, number, number][] = [
-    [1.32, 0.56, 0.96],
-    [1.32, 0.56, -0.96],
-    [-1.32, 0.56, 0.96],
-    [-1.32, 0.56, -0.96],
-  ];
-  wheelPositions.forEach(([x, y, z]) => {
+  wheels.forEach(([x, y, z]) => {
     const w = makeWheel(style.rim);
+    if (wheelScale !== 1) w.scale.setScalar(wheelScale);
     w.position.set(x, y, z);
     group.add(w);
   });
@@ -594,15 +608,16 @@ function makeCarMesh(style: CarStyle) {
   return group;
 }
 
-// Catalogue de voitures de la boutique (la première est gratuite)
+// Catalogue de voitures de la boutique — différentes sortes (formes distinctes)
+// P1 démarre avec la GT rouge (idx 0), P2 avec la GT bleue (idx 1) ; les deux gratuites
 const CAR_CATALOG: { name: string; price: number; style: CarStyle }[] = [
-  { name: "Argent", price: 0, style: { body: 0xc9ced6, metalness: 0.7, roughness: 0.28, rim: 0xeef2f7, glass: 0x10141c, underglow: 0 } },
-  { name: "Inferno", price: 120, style: { body: 0xe0301f, metalness: 0.5, roughness: 0.28, rim: 0x1a1a1e, glass: 0x14060a, underglow: 0 } },
-  { name: "Azur", price: 120, style: { body: 0x2360ff, metalness: 0.6, roughness: 0.25, rim: 0xeef2f7, glass: 0x081018, underglow: 0 } },
-  { name: "Émeraude", price: 220, style: { body: 0x14c06a, metalness: 0.75, roughness: 0.2, rim: 0xffd23f, glass: 0x06140c, underglow: 0 } },
-  { name: "Or massif", price: 380, style: { body: 0xffc400, metalness: 1.0, roughness: 0.16, rim: 0x2a2a2a, glass: 0x141008, underglow: 0xffae00 } },
-  { name: "Néon", price: 520, style: { body: 0x0c0c16, metalness: 0.3, roughness: 0.5, rim: 0xff2bd6, glass: 0x05050a, underglow: 0xff2bd6 } },
-  { name: "Carbone", price: 460, style: { body: 0x23232c, metalness: 0.45, roughness: 0.45, rim: 0xff3b30, glass: 0x05050a, underglow: 0x00e5ff } },
+  { name: "GT Rouge", price: 0, style: { shape: "sport", body: 0xe0301f, metalness: 0.55, roughness: 0.28, rim: 0x1a1a1e, glass: 0x14060a, underglow: 0 } },
+  { name: "GT Bleue", price: 0, style: { shape: "sport", body: 0x2360ff, metalness: 0.6, roughness: 0.25, rim: 0xeef2f7, glass: 0x081018, underglow: 0 } },
+  { name: "Muscle", price: 160, style: { shape: "muscle", body: 0xff7a18, metalness: 0.55, roughness: 0.3, rim: 0x222226, glass: 0x140a04, underglow: 0 } },
+  { name: "Pickup", price: 210, style: { shape: "pickup", body: 0x2f9e44, metalness: 0.4, roughness: 0.45, rim: 0x2a2a2a, glass: 0x06140c, underglow: 0 } },
+  { name: "Formule 1", price: 360, style: { shape: "f1", body: 0xe8ecf2, metalness: 0.55, roughness: 0.3, rim: 0xff3b30, glass: 0x05050a, underglow: 0 } },
+  { name: "Buggy", price: 260, style: { shape: "buggy", body: 0xffd23f, metalness: 0.4, roughness: 0.5, rim: 0x1a1a1e, glass: 0x05050a, underglow: 0 } },
+  { name: "Néon GT", price: 520, style: { shape: "sport", body: 0x0c0c16, metalness: 0.3, roughness: 0.5, rim: 0xff2bd6, glass: 0x05050a, underglow: 0xff2bd6 } },
 ];
 
 type Pebble = {
@@ -1553,9 +1568,9 @@ export default function RaceGame3D() {
   // Argent, améliorations et voitures par joueur (persistants entre les courses de la session)
   const moneyRef = useRef<[number, number]>([0, 0]);
   const upgradesRef = useRef<Upgrades[]>([makeUpgrades(), makeUpgrades()]);
-  // P1 démarre avec la rouge (Inferno), P2 avec la bleue (Azur) — couleurs d'identité
-  const ownedCarsRef = useRef<Set<number>[]>([new Set([1]), new Set([2])]);
-  const selectedCarRef = useRef<[number, number]>([1, 2]);
+  // P1 démarre avec la GT rouge (idx 0), P2 avec la GT bleue (idx 1) — couleurs d'identité
+  const ownedCarsRef = useRef<Set<number>[]>([new Set([0]), new Set([1])]);
+  const selectedCarRef = useRef<[number, number]>([0, 1]);
   const [tick, setTick] = useState(0);
   const [shopTick, setShopTick] = useState(0);
   const [winner, setWinner] = useState<string | null>(null);
